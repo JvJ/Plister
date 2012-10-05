@@ -1,0 +1,51 @@
+(ns plister.core
+  (:require (clojure [string :as str] [xml :as xml])))
+
+(defn foo
+  "I don't do a whole lot."
+  [x]
+  (println x "Hello, World!"))
+
+
+
+(defn map-to-plist
+  ;;"This makes a map into something that doesn't suck"
+  [m]
+  (->>
+   (for [[k v] m]
+     [
+      {:tag :key :attrs nil :content [(name k)]}
+      (cond (vector? v) {:tag :array
+                         :attrs nil
+                         :content (vec (mapcat map-to-plist
+                                       v))}
+            (map? v) {:tag :dict
+                      :attrs nil
+                      :content (vec (map-to-plist v))}
+            (string? v) {:tag :string
+                         :attrs nil
+                         :content [(str v)]}
+            (integer? v) {:tag :integer
+                          :attrs nil
+                          :content [(str v)]}
+            (float? v) {:tag :float
+                        :attrs nil
+                        :content [(str v)]})])
+   (apply concat)
+   (vec)))
+
+(defn make-plist
+  [m]
+  {:tag :plist
+   :attrs {:version "1.0"}
+   :content (map-to-plist m)
+   })
+
+(defn -main
+  [& filenames]
+  (doseq [f filenames]
+    (->>
+     (load-file f)
+     (make-plist)
+     (xml/emit)
+     (spit (str/replace f #"\.clj" ".xml") ))))
